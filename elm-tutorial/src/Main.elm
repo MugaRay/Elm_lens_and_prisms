@@ -54,7 +54,7 @@ getBasicName: Lens BasicRecord String
 getBasicName = 
     {
         get = \structure -> structure.name
-    ,   set = \structure value -> {structure | name= value}
+    ,   set = \structure value -> {structure | name = value}
     }
 
 getBasicEmail: Prism BasicRecord String 
@@ -125,20 +125,53 @@ randomName = BasicData {
 
 
 
+-- i want to get PerUserData which is a prism 
+-- then a lens for name 
+
+getUserData: Prism Model PerUserData
+getUserData = 
+    {
+        get = \structure -> 
+            case structure.perUserData of
+                    Nothing -> Nothing
+                    Just a -> Just a 
+    ,    set = \structure value ->
+            {structure | perUserData = Just value} 
+    }
+
+
+
+-- Compose 
+-- Model to string
+-- prism and Lens compose 
+composePL: Prism a b -> Lens b c -> Prism a c
+composePL x y  = 
+    {
+        get = \structure ->  
+            case x.get structure of 
+                Nothing -> Nothing
+                Just a -> Just (y.get a)
+    ,   set = \structure value ->
+            case x.get structure of 
+                Nothing -> {structure | } 
+            x.set structure (y.set (x.get structure) value)             
+    }
+
+
+
+getName: Prism PerUserData String
+getName = composePL getPerUserName
 
 
 -- Model 
 type alias Model =
-    {   showing: String
-    ,   students : List String
-    ,   perUserData : Maybe PerUserData
+    {  students : List String
+    ,  perUserData : Maybe PerUserData
     }
 
 init : Model
 init =  
-    {
-        showing = ""
-    ,   students = ["carl", "manny", "Lusi"]
+    {   students = ["carl", "manny", "Lusi"]
     ,   perUserData = Just randomName
     }
 
