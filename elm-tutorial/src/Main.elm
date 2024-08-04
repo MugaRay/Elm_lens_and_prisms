@@ -34,6 +34,15 @@ type PerUserData
     | BasicData BasicRecord 
 
 
+
+-- Model 
+type alias Model =
+    {  students : List String
+    ,  perUserData : Maybe PerUserData
+    }
+
+
+
 -- Lens and prisms
 -- This should happen one layer at a time to stop unnessary code from being writtern !!!!!!!!!!
 
@@ -49,7 +58,59 @@ type alias Prism structure value =
     }
 
 
+
+
+-- Compose functons 
+composePL: Prism a b -> Lens b c -> Prism a c
+composePL x y  = 
+    {
+        get = \structure ->  
+            case x.get structure of 
+                Nothing -> Nothing
+                Just a -> Just (y.get a)
+    ,   set = \structure value ->
+            let
+               struct = x.get structure  
+            in
+            case struct of 
+                Nothing -> structure
+                Just a -> x.set structure (y.set a value)             
+    }
+
+composePP: Prism a b -> Prism b c -> Prism a c 
+composePP x y = 
+    {
+        get = \structure ->
+            case x.get structure of
+                Nothing -> Nothing
+                Just a -> 
+                    case y.get a of
+                        Nothing -> Nothing
+                        Just b -> Just b
+    ,   set = \structure value ->
+                let
+                    struct = x.get structure
+                in
+                    case struct of 
+                        Nothing -> structure 
+                        Just a -> x.set structure (y.set a value)
+    }
+
+
+
 -- Lens and prism implementations
+userName: Lens PerUserData String
+userName = 
+    {
+        get =  \structure -> 
+            case structure of 
+                ComprehensiveRecordData v -> v.name 
+                BasicData v -> v.name
+    ,   set = \structure value -> 
+            case structure of 
+                ComprehensiveRecordData v -> ComprehensiveRecordData {v | name = value} 
+                BasicData v -> BasicData {v | name = value}
+    }
 
 
 getPerUserEmail: Prism PerUserData String 
@@ -68,69 +129,29 @@ getPerUserEmail  =
                         Just _ -> BasicData {v | email = Just value}
     }
 
-getBasicEmail: Prism BasicRecord String 
-getBasicEmail = 
-    {
-        get = \structure -> 
-            case structure.email of 
-                Nothing -> Nothing
-                Just a -> Just a
-    ,   set = \structure value ->
-            case structure.email of
-                Nothing -> structure
-                Just _ -> {structure | email= Just value}
-    }
 
-
-getComprehensiveEmail: Lens ComprehensiveRecord String 
-getComprehensiveEmail =
-    {
-        get = \structure -> structure.email
-    ,   set = \structure value -> {structure | email = value}
-    }
-
-
-
-getComprehensivePenalty: Lens ComprehensiveRecord Float 
-getComprehensivePenalty =
+comprehensivePenalty: Lens ComprehensiveRecord Float 
+comprehensivePenalty =
     {
         get = \structure -> structure.penaltyAmount
     ,   set = \structure value -> {structure | penaltyAmount = value}
     }
 
 
-getPerUserName: Lens PerUserData String
-getPerUserName = 
+getComprehensiveRecord : Prism PerUserData ComprehensiveRecord
+getComprehensiveRecord = 
     {
-        get =  \structure -> 
+        get = \structure ->
             case structure of 
-                ComprehensiveRecordData v -> v.name 
-                BasicData v -> v.name
-    ,   set = \structure value -> 
-            case structure of 
-                ComprehensiveRecordData v -> ComprehensiveRecordData {v | name = value} 
-                BasicData v -> BasicData {v | name = value}
+                BasicData _ -> Nothing 
+                ComprehensiveRecordData v -> Just v
+    ,   set = \structure value ->
+            case structure of
+                BasicData _ -> structure 
+                ComprehensiveRecordData _ -> ComprehensiveRecordData value
     }
 
 
-
-getComprehensiveRecord: PerUserData -> Maybe ComprehensiveRecord
-getComprehensiveRecord userData 
-    = case userData of
-        BasicData _ -> Nothing
-        ComprehensiveRecordData v -> Just v
-
-
-
-randomName = BasicData {
-        name = "carl"
-    ,   email = Just "Hello"
-    }
-
-
-
--- i want to get PerUserData which is a prism 
--- then a lens for name 
 
 getUserData: Prism Model PerUserData
 getUserData = 
@@ -147,46 +168,42 @@ getUserData =
 
 
 
--- Compose 
--- Model to string
--- prism and Lens compose 
-composePL: Prism a b -> Lens b c -> Prism a c
-composePL x y  = 
-    {
-        get = \structure ->  
-            case x.get structure of 
-                Nothing -> Nothing
-                Just a -> Just (y.get a)
-    ,   set = \structure value ->
-            let
-               struct = x.get structure  
-            in
-            case struct of 
-                Nothing -> structure
-                Just a -> x.set structure (y.set a value)             
-    }
+
+-- compositions 
+
+perUserName: Prism Model String
+perUserName = composePL getUserData userName
+
+perUserComprensiveRecord: Prism Model ComprehensiveRecord
+perUserComprensiveRecord = composePP getUserData getComprehensiveRecord
+
+perUserPenality: Prism Model Float 
+perUserPenality = composePL perUserComprensiveRecord comprehensivePenalty
 
 
 
-getName: Prism Model String
-getName = composePL getUserData getPerUserName
+-- Get User Index
+getStudentAt: List String -> Int -> Maybe String 
+getStudentAt lst index =
+    let innerRec : Int -> List String -> Maybe String
+        innerRec curr l =
+            case l of 
+                [] -> Nothing
+                x::xs -> 
+                    if curr == index then 
+                        Just x
+                    else
+                        innerRec (curr + 1) xs 
+    in 
+        innerRec 0 lst
 
 
+-- init 
 
-{- TODO   
-
-    - Model to email 
-        Prism -> Prism -> Prism 
-    - Model to Penalty
-        prism -> Lens  -> Prism 
-    - Model to ComprehensiveRecord
-            prism -> Lens -> Prism
--}
-
--- Model 
-type alias Model =
-    {  students : List String
-    ,  perUserData : Maybe PerUserData
+randomName : PerUserData
+randomName = BasicData {
+        name = "carl"
+    ,   email = Just "Hello"
     }
 
 init : Model
@@ -194,10 +211,6 @@ init =
     {   students = ["carl", "manny", "Lusi"]
     ,   perUserData = Just randomName
     }
-
-
-
-
 
 
 
@@ -212,7 +225,6 @@ update msg model =
     case msg of 
         Name -> model 
         NoShow -> model
-
 
 
 
