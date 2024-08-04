@@ -64,8 +64,10 @@ getBasicEmail =
             case structure.email of 
                 Nothing -> Nothing
                 Just a -> Just a
-    ,   set = \structure value -> 
-                    {structure | email= Just value}
+    ,   set = \structure value ->
+            case structure.email of
+                Nothing -> structure
+                Just _ -> {structure | email= Just value}
     }
 
 
@@ -136,7 +138,9 @@ getUserData =
                     Nothing -> Nothing
                     Just a -> Just a 
     ,    set = \structure value ->
-            {structure | perUserData = Just value} 
+                case structure.perUserData of 
+                    Nothing -> structure
+                    Just a -> {structure | perUserData = Just value} 
     }
 
 
@@ -152,15 +156,19 @@ composePL x y  =
                 Nothing -> Nothing
                 Just a -> Just (y.get a)
     ,   set = \structure value ->
-            case x.get structure of 
-                Nothing -> {structure | } 
-            x.set structure (y.set (x.get structure) value)             
+            let
+               struct = x.get structure  
+            in
+            case struct of 
+                Nothing -> structure
+                Just a -> x.set structure (y.set a value)             
     }
 
 
 
-getName: Prism PerUserData String
-getName = composePL getPerUserName
+getName: Prism Model String
+getName = composePL getUserData getPerUserName
+
 
 
 -- Model 
