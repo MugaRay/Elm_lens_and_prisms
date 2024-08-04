@@ -35,6 +35,7 @@ type PerUserData
 
 
 -- Lens and prisms
+-- This should happen one layer at a time to stop unnessary code from being writtern !!!!!!!!!!
 
 type alias Lens structure value = 
     {
@@ -50,11 +51,21 @@ type alias Prism structure value =
 
 -- Lens and prism implementations
 
-getBasicName: Lens BasicRecord String
-getBasicName = 
+
+getPerUserEmail: Prism PerUserData String 
+getPerUserEmail  = 
     {
-        get = \structure -> structure.name
-    ,   set = \structure value -> {structure | name = value}
+        get = \structure ->
+            case structure of
+                BasicData a -> a.email
+                ComprehensiveRecordData v -> Just v.email
+    ,   set =  \structure value ->
+            case structure of 
+                ComprehensiveRecordData v -> ComprehensiveRecordData {v | email = value}
+                BasicData v -> 
+                    case v.email of 
+                        Nothing -> BasicData v
+                        Just _ -> BasicData {v | email = Just value}
     }
 
 getBasicEmail: Prism BasicRecord String 
@@ -68,15 +79,6 @@ getBasicEmail =
             case structure.email of
                 Nothing -> structure
                 Just _ -> {structure | email= Just value}
-    }
-
-
-
-getComprehensiveName: Lens ComprehensiveRecord String 
-getComprehensiveName =
-    {
-        get = \structure -> structure.name
-    ,   set = \structure value -> {structure | name = value}
     }
 
 
@@ -140,7 +142,7 @@ getUserData =
     ,    set = \structure value ->
                 case structure.perUserData of 
                     Nothing -> structure
-                    Just a -> {structure | perUserData = Just value} 
+                    Just _ -> {structure | perUserData = Just value} 
     }
 
 
@@ -170,6 +172,16 @@ getName: Prism Model String
 getName = composePL getUserData getPerUserName
 
 
+
+{- TODO   
+
+    - Model to email 
+        Prism -> Prism -> Prism 
+    - Model to Penalty
+        prism -> Lens  -> Prism 
+    - Model to ComprehensiveRecord
+            prism -> Lens -> Prism
+-}
 
 -- Model 
 type alias Model =
